@@ -69,7 +69,7 @@ def fetch_data_from_endpoint(token, endpoint, sort="id", direction="asc", year="
 
         all_data.extend(response_json['data'])
 
-        # print(f"Successfully fetched data for page {current_page}. Total records: {len(all_data)}")  # Debugging statement
+        print(f"Successfully fetched data for page {current_page}. Total records: {len(all_data)}")  # Debugging statement
 
         if 'next' in response_json['collection'] and response_json['collection']['next']:
             current_page += 1
