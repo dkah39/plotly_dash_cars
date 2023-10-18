@@ -5,45 +5,79 @@ import dash_bootstrap_components as dbc
 import plotly.express as px
 import plotly.graph_objects as go
 
+# ------------------ Data Preparation Functions ------------------
 
-# Read the JSON file into a DataFrame
+def read_and_flatten_json(json_path):
+    """Read JSON file and flatten the nested 'make_model_trim' column."""
+    raw_data = pd.read_json(json_path)
+    flattened_data = pd.json_normalize(raw_data['make_model_trim'])
+    flattened_data.columns = [f"make_model_trim_{col}" for col in flattened_data.columns]
+    return raw_data, flattened_data
 
-allcars_raw = pd.read_json('./data/engines_data.json')
+def clean_and_rename_columns(raw_data, flattened_data):
+    """Clean and rename columns for easier analysis."""
+    all_cars = pd.concat([raw_data.reset_index(drop=True), flattened_data.reset_index(drop=True)], axis=1)
+    all_cars.rename(columns={
+        "make_model_trim_make_model.make.name": "make",
+        "make_model_trim_make_model.name": "model",
+        "make_model_trim_invoice": "invoice",
+        "make_model_trim_msrp": "msrp",
+        "make_model_trim_description": "description",
+        "make_model_trim_year": "year",
+        "make_model_trim_name": "trim"
+    }, inplace=True)
+    return all_cars
 
-# Flatten the nested column
-all_cars = pd.json_normalize(allcars_raw['make_model_trim'])
-all_cars.columns = [f"make_model_trim_{col}" for col in all_cars.columns]
-all_cars = pd.concat([allcars_raw.reset_index(drop=True), all_cars.reset_index(drop=True)], axis=1)
+def drop_unnecessary_columns(all_cars):
+    """Drop columns that are not needed for analysis."""
+    columns_to_drop = [
+        'make_model_trim_id',
+        'make_model_trim_make_model_id',
+        'make_model_trim_make_model.make_id',
+        'make_model_trim_make_model.id',
+        'make_model_trim_make_model.make.id',
+        'make_model_trim_created',
+        'make_model_trim_modified',
+        'make_model_trim'
+    ]
+    all_cars.drop(columns=columns_to_drop, inplace=True)
 
-# Make pretty
-all_cars = all_cars.rename(columns={
-    "make_model_trim_make_model.make.name": "make",
-    "make_model_trim_make_model.name": "model",
-    "make_model_trim_invoice": "invoice",
-    "make_model_trim_msrp": "msrp",
-    "make_model_trim_description": "description",
-    "make_model_trim_year": "year",
-    "make_model_trim_name": "trim"
-})
+def add_derived_columns(all_cars):
+    """Add derived columns for analysis."""
+    all_cars['engine_type'] = all_cars['engine_type'].str.title()
+    all_cars['fuel_type'] = all_cars['fuel_type'].str.title()
+    all_cars['horsepower_per_100_dollars'] = (all_cars['horsepower_hp'] / all_cars['msrp']) * 100
 
-all_cars = all_cars.drop(columns=[
-    'make_model_trim_id',
-    'make_model_trim_make_model_id',
-    'make_model_trim_make_model.make_id',
-    'make_model_trim_make_model.id',
-    'make_model_trim_make_model.make.id',
-    'make_model_trim_created',
-    'make_model_trim_modified',
-    'make_model_trim'
-])
-all_cars['engine_type'] = all_cars['engine_type'].str.title()
-all_cars['fuel_type'] = all_cars['fuel_type'].str.title()
+# ------------------ Main Data Preparation ------------------
 
-# Create a new column for cost($100):power ratios for later analysis
-all_cars['horsepower_per_100_dollars'] = (all_cars['horsepower_hp'] / all_cars['msrp']) * 100
+# Read and flatten JSON data
+raw_data, flattened_data = read_and_flatten_json('./data/engines_data.json')
 
+# Clean and rename columns
+all_cars = clean_and_rename_columns(raw_data, flattened_data)
 
-##--- Start the  plotly dash app ---
+# Drop unnecessary columns
+drop_unnecessary_columns(all_cars)
+
+# Add derived columns
+add_derived_columns(all_cars)
+
+# ------------------ Main Data Preparation ------------------
+
+# Read and flatten JSON data
+raw_data, flattened_data = read_and_flatten_json('./data/engines_data.json')
+
+# Clean and rename columns
+all_cars = clean_and_rename_columns(raw_data, flattened_data)
+
+# Drop unnecessary columns
+drop_unnecessary_columns(all_cars)
+
+# Add derived columns
+add_derived_columns(all_cars)
+
+# ------------------ Dash App  ------------------
+
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
 
 #Datasets, lists and artifacts
@@ -54,7 +88,7 @@ fuel_type_checklist = all_cars['fuel_type'].unique()
 all_cars['msrp_qcut'] = pd.qcut(all_cars['msrp'], q=5, labels=['Q1', 'Q2', 'Q3', 'Q4', 'Q5'])
 
 # Existing code for creating the string labels
-quantile_ranges = all_cars.groupby('msrp_qcut')['msrp'].agg(['min', 'max']).reset_index()
+quantile_ranges = all_cars.groupby('msrp_qcut', observed=True)['msrp'].agg(['min', 'max']).reset_index()
 quantile_labels = [f"${row['min']:,.0f} to ${row['max']:,.0f}" for index, row in quantile_ranges.iterrows()]
 # Create a dictionary to map 'msrp_qcut' labels to string labels
 quantile_dict = {qcut: label for qcut, label in zip(['Q1', 'Q2', 'Q3', 'Q4', 'Q5'], quantile_labels)}
@@ -224,7 +258,7 @@ def update_box_graph_with_markers(engine_type_selected, price_range_selected, ma
         showlegend=False
     ),
     #This is a box-graph x-axis sorter based on the median horsepower_per_100_dollars col so we see low to hi, not Acura to Volvo.
-    filtered_df_agg_make_median = df_to_plot.groupby('make')['horsepower_per_100_dollars'].median().reset_index()
+    filtered_df_agg_make_median = df_to_plot.groupby('make', observed=True)['horsepower_per_100_dollars'].median().reset_index()
     filtered_df_agg_make_median_sort_list = filtered_df_agg_make_median.sort_values('horsepower_per_100_dollars')['make'].tolist()
     
     figBox.update_layout(
