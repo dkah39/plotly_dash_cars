@@ -62,20 +62,6 @@ drop_unnecessary_columns(all_cars)
 # Add derived columns
 add_derived_columns(all_cars)
 
-# ------------------ Main Data Preparation ------------------
-
-# Read and flatten JSON data
-raw_data, flattened_data = read_and_flatten_json('./data/engines_data.json')
-
-# Clean and rename columns
-all_cars = clean_and_rename_columns(raw_data, flattened_data)
-
-# Drop unnecessary columns
-drop_unnecessary_columns(all_cars)
-
-# Add derived columns
-add_derived_columns(all_cars)
-
 # ------------------ Dash App  ------------------
 
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
