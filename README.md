@@ -1,4 +1,4 @@
-```markdown
+
 # Car Data Dashboard
 
 ## Overview
@@ -70,4 +70,3 @@ Thanks to the team at [CarAPI](https://carapi.app/api) for allowing free usage o
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
-```
